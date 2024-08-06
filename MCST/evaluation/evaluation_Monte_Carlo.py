@@ -156,6 +156,8 @@ def evaluation(model, args):
                          state_labels_cpu[0, args.predictor_time_series_len:, 0, 7]) ** 2
                       ) ** 0.5
     return predict_error, predict_vel_err, update_err, update_vel_err
+
+
 if __name__ == '__main__':
     args = config.Args().get_parser()
     # setup_seed(args.seed)
@@ -166,6 +168,8 @@ if __name__ == '__main__':
                                                      args.predictor_lstm_num_layers,
                                                      args.predictor_MCU_num_layers,
                                                      args.predictor_sampling_num,
+                                                     args.predictor_MCU_layer,
+                                                     args.predictor_MCU_hidden_features,
                                                      args.updater_in_features,
                                                      args.updater_hidden_features,
                                                      args.updater_out_features,

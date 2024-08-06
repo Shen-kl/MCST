@@ -32,7 +32,7 @@ class Args:
         parser.add_argument('--eval_batch_size', default=1, type=int)
         parser.add_argument('--optimizer_factor', default=0.8, type=int)
         parser.add_argument('--optimizer_patience', default=5, type=int)
-        parser.add_argument('--lr', default=1e-5, type=float,
+        parser.add_argument('--lr', default=1e-3, type=float,
                             help='learning rate')
         # train args
         parser.add_argument('--dropout_prob', default=0.1, type=float,

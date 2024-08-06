@@ -233,22 +233,22 @@ def train_and_evaluate(model,
                         # 对张量进行最小-最大归一化
                         predict_history = torch.cat(tarTracks.x_predict_history, dim=1).clone()
                         update_history = torch.cat(tarTracks.x_update_history, dim=1).clone()
-                        (normalized_state_labels, normalized_detections, normalized_predict_history, normalized_update_history,
+                        (normalized_state_labels, normalized_detections, normalized_update_history,
                          min_vals, max_vals) = \
                             minMaxScaler(
                                 state_labels[:, frame_index - args.predictor_time_series_len: frame_index + 1, :,
                                 [0, 1, 3, 4, 6, 7]],
                                 detections[:, frame_index - args.predictor_time_series_len: frame_index + 1, :, :],
-                                predict_history[:, -args.predictor_time_series_len:, :],
                                 update_history[:, -args.predictor_time_series_len:, :], args.T, args.max_velocity,
                                 mode="-1_1")
 
-                        (_, normalized_detections_MCU, _, normalized_update_history_MCU,
+                        tmp = (frame_index - args.predictor_MCU_len) if (
+                                                                                    frame_index - args.predictor_MCU_len) > 0 else 0
+                        (_, normalized_detections_MCU, normalized_update_history_MCU,
                          min_vals, max_vals) = \
-                            minMaxScaler_MCU(state_labels[:, frame_index - args.predictor_MCU_len: frame_index, :,
+                            minMaxScaler_MCU(state_labels[:, tmp: frame_index, :,
                                              [0, 1, 3, 4, 6, 7]],
-                                             detections[:, frame_index - args.predictor_MCU_len: frame_index, :, :],
-                                             predict_history,
+                                             detections[:, tmp: frame_index, :, :],
                                              update_history, args.T, args.max_velocity, mode="-1_1")
 
                         if frame_index - args.predictor_MCU_len < 0:

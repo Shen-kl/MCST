@@ -17,7 +17,7 @@ def evaluation(model, args):
     state_labels, detections = DataLoadFromMatlab_oneTarget_3D_for_paper()
 
     minMaxScaler = MyMinMaxScaler()
-    minMaxScaler_fft = MyMinMaxScaler()  # 归一化方法
+    minMaxScaler_MCU = MyMinMaxScaler()  # 归一化方法
 
     detections = detections.to(args.device)  # (batch, n_frames_Ob, ob_num_max, 2)
     state_labels = state_labels.to(args.device)  # (batch, n_frames_state_labels, tg_num_max, 4)
@@ -54,7 +54,7 @@ def evaluation(model, args):
         tmp = (frame_index - args.predictor_MCU_len) if (frame_index - args.predictor_MCU_len) > 0 else 0
         (_, normalized_detections_MCU, normalized_update_history_MCU,
          min_vals, max_vals) = \
-            minMaxScaler_fft(state_labels[:, tmp : frame_index, :,
+            minMaxScaler_MCU(state_labels[:, tmp : frame_index, :,
                              [0, 1, 3, 4, 6, 7]],
                              detections[:, tmp : frame_index, :, :],
                              update_history, args.T, args.max_velocity, mode="-1_1")
@@ -62,10 +62,12 @@ def evaluation(model, args):
             normalized_detections_MCU = torch.cat([torch.zeros([normalized_detections_MCU.shape[0],
                                              args.predictor_MCU_len - normalized_detections_MCU.shape[1],
                                              normalized_detections_MCU.shape[2],
-                                             normalized_detections_MCU.shape[3]]).to(normalized_detections_MCU.device),normalized_detections_MCU], dim=1)
+                                             normalized_detections_MCU.shape[3]]).to(normalized_detections_MCU.device),
+                                                   normalized_detections_MCU], dim=1)
             normalized_update_history_MCU = torch.cat([torch.zeros([normalized_update_history_MCU.shape[0],
                                              args.predictor_MCU_len - normalized_update_history_MCU.shape[1],
-                                             normalized_update_history_MCU.shape[2]]).to(normalized_update_history_MCU.device), normalized_update_history_MCU],dim=1)
+                                             normalized_update_history_MCU.shape[2]]).to(normalized_update_history_MCU.device),
+                                                       normalized_update_history_MCU],dim=1)
 
         label_tmp.append(normalized_state_labels[0, -1, 0, :].unsqueeze(dim=0).cpu().detach())
         input_sigma = torch.cat(tarTracks.x_sigma, dim=1).detach()
@@ -182,6 +184,7 @@ if __name__ == '__main__':
     update_loc_err_Monte_Carlo = []
     update_vel_err_Monte_Carlo = []
     for index in range(Monte_Carlo):
+        print('Monte Carlo index: %d\n' %(index))
         predict_error, predict_vel_err, update_err, update_vel_err = evaluation(track_model, args)
         predict_loc_err_Monte_Carlo.append(predict_error)
         predict_vel_err_Monte_Carlo.append(predict_vel_err)

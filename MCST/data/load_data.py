@@ -54,7 +54,7 @@ def DataLoadFromMatlab_oneTarget_3D_for_paper():
     state_labels = []
     detections =[]
     for frame in range(1, 201):
-        path = "./dataset/scene007/"+"state_labels" + ('%02d' % frame) + ".mat"
+        path = "../dataset/scene007/"+"state_labels" + ('%02d' % frame) + ".mat"
         matr = io.loadmat(path)
         savedata_origin = matr.get('savedata')
         savedata_origin= savedata_origin.astype(float)
@@ -62,7 +62,7 @@ def DataLoadFromMatlab_oneTarget_3D_for_paper():
     state_labels = torch.cat(state_labels, dim=0)
 
     for frame in range(1, 201):
-        path = "./dataset/scene007/"+"Ob" + ('%02d' % frame) + ".mat"
+        path = "../dataset/scene007/"+"Ob" + ('%02d' % frame) + ".mat"
         matr = io.loadmat(path)
         savedata_ob = matr.get('savedata')
         savedata_ob = savedata_ob.astype(float)

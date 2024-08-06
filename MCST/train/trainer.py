@@ -367,6 +367,17 @@ def train_and_evaluate(model,
 
         lr_schedule.step(sum(train_track_model_loss_sum) / len(train_track_model_loss_sum))
 
+        logger.debug("train_loss:{},index:{}".format(sum(train_track_model_loss_sum) / len(train_track_model_loss_sum),
+                                                    index))
+        logger.debug("train_predict_location_evaluation:{},index:{}".format(
+            sum(train_track_model_predict_location_evalutaion_sum) / len(train_track_model_predict_location_evalutaion_sum), index))
+        logger.debug("train_predict_velocity_evaluation:{},index:{}".format(
+            sum(train_track_model_predict_velocity_evalutaion_sum) / len(train_track_model_predict_velocity_evalutaion_sum), index))
+        logger.debug("train_update_location_evaluation:{},index:{}".format(
+            sum(train_track_model_update_location_evalutaion_sum) / len(train_track_model_update_location_evalutaion_sum), index))
+        logger.debug("train_update_velocity_evaluation:{},index:{}".format(
+            sum(train_track_model_update_velocity_evalutaion_sum) / len(train_track_model_update_velocity_evalutaion_sum), index))
+
         now = time.localtime()
         nowt = time.strftime("%Y_%m_%d_%H_%M_", now)
         train_evaluation = sum(train_track_model_update_location_evalutaion_sum) / len(train_track_model_update_location_evalutaion_sum) \

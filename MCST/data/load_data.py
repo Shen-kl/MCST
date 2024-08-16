@@ -23,26 +23,17 @@ class DataLoad_OneManeuveringTarget_3D(data.Dataset):
     def __getitem__(self, idx):
         scence_path = self.all_scence_path[idx]
         scence_path = os.path.join(self.data_root, scence_path)
-        frame_list = os.listdir(scence_path)
-        state_labels = []
-        detections=[]
+        data_list = os.listdir(scence_path)
 
-        frame_list.sort()
-        for frame_id in range(len(frame_list)):
-            detail_frame_path = os.path.join(scence_path, frame_list[frame_id])
-            in_out = np.load(detail_frame_path, allow_pickle=True).tolist()
-            param = torch.tensor(in_out, dtype=torch.float32)
+        data_list.sort()
 
-            if True in (torch.isnan(param)):
-                print('error')
+        detail_data_path = os.path.join(scence_path, data_list[0])
+        detections_ndarry = np.load(detail_data_path, allow_pickle=True).tolist()
+        detections = torch.tensor(detections_ndarry, dtype=torch.float32).permute(0, 2, 1)
 
-            if frame_id < self.n_frames:
-                detections.append(np.transpose(param).unsqueeze(dim=0))
-            else:
-                state_labels.append(np.transpose(param).unsqueeze(dim=0))
-
-        state_labels = torch.cat(state_labels, dim=0)
-        detections = torch.cat(detections, dim=0)
+        detail_data_path = os.path.join(scence_path, data_list[1])
+        state_labels_ndarry = np.load(detail_data_path, allow_pickle=True).tolist()
+        state_labels = torch.tensor(state_labels_ndarry, dtype=torch.float32).permute(0, 2, 1)
 
         return [detections, state_labels]
 

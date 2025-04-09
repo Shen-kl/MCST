@@ -1,18 +1,3 @@
-## MCST: An adaptive tracking algorithm for high-speed and highly maneuverable targets based on bidirectional LSTM network
-
-### Introduction
-This is the Pytorch implementation of "MCST: An adaptive tracking algorithm for high-speed and highly maneuverable targets based on bidirectional LSTM network"
-
-The proposed model consists of the Predictor and the Updater, and is used to track high speed and high maneuvering targets in three-dimensional space.
-
-### Dataset
-
-
-
-
-
----
-
 ## 🚀 MCST: Maneuver Compensation Strong Tracker
 
 MCST is an adaptive deep learning-based radar target tracking algorithm designed to handle **high-speed** and **highly maneuverable targets**. It leverages a **Bi-LSTM architecture** with a **dual-level attention mechanism** and a custom **Maneuver Compensation Unit (MCU)** to achieve robust and accurate tracking performance, even under extreme target dynamics and observation uncertainties.
@@ -37,7 +22,7 @@ MCST is an adaptive deep learning-based radar target tracking algorithm designed
 
 ## 🖼️ Model Architecture
 
-![MCST Architecture](./assets/mcst_architecture.png)  
+![MCST Architecture](./MC-LSTM_architecturev4.png)  
 *A hybrid Bi-LSTM + attention framework with maneuver compensation and uncertainty modeling.*
 
 ---
@@ -46,13 +31,14 @@ MCST is an adaptive deep learning-based radar target tracking algorithm designed
 
 ```bash
 MCST/
-├── configs/             # Model and training configs
+├── config.py            # Model and training configs
 ├── data/                # Dataset and preprocessing scripts
 ├── models/              # Model definitions (Predictor, MCU, Updater)
-├── utils/               # Utilities (normalization, sampling, evaluation)
-├── train.py             # Training pipeline
-├── evaluate.py          # Evaluation and metrics
-├── README.md
+├── utils/               # Utilities (normalization, trajectory initialization)
+├── train/               # Training pipeline
+├── evaluation/          # Evaluation and metrics
+├── log/                 # log
+├── main.py
 ```
 
 ---
@@ -64,7 +50,6 @@ MCST/
 ```bash
 conda create -n mcst python=3.9
 conda activate mcst
-pip install -r requirements.txt
 ```
 
 ### 2. Download Dataset

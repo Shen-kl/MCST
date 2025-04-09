@@ -11,7 +11,7 @@ import mpldatacursor
 from utils.MinMaxScaler import MyMinMaxScaler
 from models.MCST import ManeuverCompensationStrongTracker
 from statistics import mean
-Monte_Carlo = 100
+Monte_Carlo = 10
 # 使用六维状态向量
 def evaluation(model, args):
     state_labels, detections = DataLoadFromMatlab_oneTarget_3D_for_paper()
@@ -24,6 +24,8 @@ def evaluation(model, args):
 
     detections = detections.to(torch.float32)
     state_labels = state_labels.to(torch.float32)
+
+    model.load_state_dict(torch.load(args.checkpoint)['state_dict'])  # 2024_03_26_20_42_ 2024_04_01_20_02_
 
     # 模型
     model.eval()

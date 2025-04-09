@@ -26,9 +26,6 @@ def train_and_evaluate(model,
     min_evaluation = 2e8
 
     for index in range(args.train_epochs):
-        print("memory difference")
-        # tr.print_diff()
-
         model.train()
         train_track_model_loss_sum = []
         test_track_model_loss_sum = []
@@ -390,5 +387,5 @@ def train_and_evaluate(model,
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss': sum(test_track_model_loss_sum) / len(test_track_model_loss_sum),
                 'lr_schedule': lr_schedule.state_dict()
-            }, './state_dict/ManeuverCompensationStrongTracker3D/' + str(nowt) + ".pth")
+            }, args.output_dir + 'ManeuverCompensationStrongTracker3D/' + str(nowt) + ".pth")
 

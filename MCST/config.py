@@ -10,9 +10,9 @@ class Args:
     @staticmethod
     def initialize(parser):
         # args for path
-        parser.add_argument('--output_dir', default='./checkpoints/',
+        parser.add_argument('--output_dir', default='./checkpoint/',
                             help='the output dir for model checkpoints')
-        parser.add_argument('--checkpoint', default='./checkpoints/mcst_best.pth', type=str,
+        parser.add_argument('--checkpoint', default='../checkpoint/mcst_best.pth', type=str,
                             help='Path to model checkpoint')
         parser.add_argument('--data_dir', default='G:/Dataset/OneManeuveringTarget3D/', type=str,
                             help='data dir for uer')
@@ -45,7 +45,6 @@ class Args:
         parser.add_argument('--predictor_hidden_features', default=64, type=float)
         parser.add_argument('--predictor_out_features', default=6, type=float,)
         parser.add_argument('--predictor_lstm_num_layers', default=2, type=float,)
-        parser.add_argument('--predictor_MCU_num_layers', default=2, type=float)
         parser.add_argument('--predictor_sampling_num', default=5, type=int)
         parser.add_argument('--predictor_time_series_len', default=5, type=float)
         parser.add_argument('--predictor_MCU_len', default=16, type=float,)

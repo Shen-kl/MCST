@@ -11,7 +11,7 @@ import mpldatacursor
 from utils.MinMaxScaler import MyMinMaxScaler
 from models.MCST import ManeuverCompensationStrongTracker
 from statistics import mean
-Monte_Carlo = 10
+Monte_Carlo = 1
 # 使用六维状态向量
 def evaluation(model, args):
     state_labels, detections = DataLoadFromMatlab_oneTarget_3D_for_paper()
@@ -19,15 +19,15 @@ def evaluation(model, args):
     minMaxScaler = MyMinMaxScaler()
     minMaxScaler_MCU = MyMinMaxScaler()  # 归一化方法
 
-    detections = detections.to(args.device)  # (batch, n_frames_Ob, ob_num_max, 2)
-    state_labels = state_labels.to(args.device)  # (batch, n_frames_state_labels, tg_num_max, 4)
+    detections = detections.to(args.device)  # (batch, n_frames_Ob, ob_num_max, 3)
+    state_labels = state_labels.to(args.device)  # (batch, n_frames_state_labels, tg_num_max, 9)
 
     detections = detections.to(torch.float32)
     state_labels = state_labels.to(torch.float32)
 
     model.load_state_dict(torch.load(args.checkpoint)['state_dict'])  # 2024_03_26_20_42_ 2024_04_01_20_02_
 
-    # 模型
+    # 模型设置
     model.eval()
 
     predict_output = []  # 存放预测结果
@@ -53,12 +53,12 @@ def evaluation(model, args):
                          detections[:, frame_index - args.predictor_time_series_len: frame_index + 1, :, :],
                          update_history[:, -args.predictor_time_series_len:, :], args.T, args.max_velocity, mode="-1_1")
 
-        tmp = (frame_index - args.predictor_MCU_len) if (frame_index - args.predictor_MCU_len) > 0 else 0
+        begin_tmp = (frame_index - args.predictor_MCU_len) if (frame_index - args.predictor_MCU_len) > 0 else 0
         (_, normalized_detections_MCU, normalized_update_history_MCU,
          min_vals, max_vals) = \
-            minMaxScaler_MCU(state_labels[:, tmp : frame_index, :,
+            minMaxScaler_MCU(state_labels[:, begin_tmp : frame_index, :,
                              [0, 1, 3, 4, 6, 7]],
-                             detections[:, tmp : frame_index, :, :],
+                             detections[:, begin_tmp : frame_index, :, :],
                              update_history, args.T, args.max_velocity, mode="-1_1")
         if frame_index - args.predictor_MCU_len < 0:
             normalized_detections_MCU = torch.cat([torch.zeros([normalized_detections_MCU.shape[0],
@@ -169,8 +169,8 @@ if __name__ == '__main__':
     track_model = ManeuverCompensationStrongTracker(args.predictor_in_features,
                                                      args.predictor_hidden_features,
                                                      args.predictor_out_features,
+                                                     args.dropout_prob,
                                                      args.predictor_lstm_num_layers,
-                                                     args.predictor_MCU_num_layers,
                                                      args.predictor_sampling_num,
                                                      args.predictor_MCU_layer,
                                                      args.predictor_MCU_hidden_features,
@@ -199,24 +199,10 @@ if __name__ == '__main__':
     update_vel_err_Monte_Carlo_Mean = sum(update_vel_err_Monte_Carlo)/len(update_vel_err_Monte_Carlo)
 
 
-    plt.figure()
-    plt.plot(predict_error_Monte_Carlo_Mean)
-
-    plt.figure()
-    plt.plot(predict_vel_err_Monte_Carlo_Mean)
-
-    plt.figure()
-    plt.plot(update_err_Monte_Carlo_Mean)
-
-    plt.figure()
-    plt.plot(update_vel_err_Monte_Carlo_Mean)
-
     predict_error_rmse = np.mean(predict_error_Monte_Carlo_Mean ** 2)**0.5
     predict_vel_err_rmse = np.mean(predict_vel_err_Monte_Carlo_Mean ** 2) ** 0.5
     update_err_rmse = np.mean(update_err_Monte_Carlo_Mean ** 2) ** 0.5
     update_vel_err_rmse = np.mean(update_vel_err_Monte_Carlo_Mean ** 2) ** 0.5
 
-    print('predict_error_rmse:%f predict_vel_err_rmse:%f update_err_rmse:%f update_vel_err_rmse:%f'
-          %(predict_error_rmse, predict_vel_err_rmse, update_err_rmse, update_vel_err_rmse))
-
-    plt.show()
+    print(f'predict_error_rmse:{predict_error_rmse} m predict_vel_err_rmse:{predict_vel_err_rmse} m/s '
+          f'update_err_rmse:{update_err_rmse} m update_vel_err_rmse:{update_vel_err_rmse}')

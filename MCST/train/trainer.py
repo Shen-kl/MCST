@@ -35,8 +35,8 @@ def train_and_evaluate(model,
         train_track_model_predict_velocity_evalutaion_sum = []
         with tqdm(total=len(train_loader), desc=f'{index}/{args.train_epochs}') as pbar:
             for (detections, state_labels) in train_loader:
-                detections = detections.to(args.device)  # (batch, n_frames_Ob, ob_num_max, 2)
-                state_labels = state_labels.to(args.device)  # (batch, n_frames_state_labels, tg_num_max, 4)
+                detections = detections.to(args.device)  # (batch, n_frames_Ob, ob_num_max, 3)
+                state_labels = state_labels.to(args.device)  # (batch, n_frames_state_labels, tg_num_max, 9)
 
                 # 初始化类数组
                 tarTracks = TARTRACKS()  # 假设1个目标
@@ -67,12 +67,12 @@ def train_and_evaluate(model,
                                      update_history[:, -args.predictor_time_series_len:, :], args.T, args.max_velocity,
                                      mode="-1_1")
 
-                    tmp = (frame_index - args.predictor_MCU_len) if (frame_index - args.predictor_MCU_len) > 0 else 0
+                    begin_tmp = (frame_index - args.predictor_MCU_len) if (frame_index - args.predictor_MCU_len) > 0 else 0
                     (_, normalized_detections_MCU, normalized_update_history_MCU,
                      min_vals, max_vals) = \
-                        minMaxScaler_MCU(state_labels[:, tmp: frame_index, :,
+                        minMaxScaler_MCU(state_labels[:, begin_tmp: frame_index, :,
                                          [0, 1, 3, 4, 6, 7]],
-                                         detections[:, tmp: frame_index, :, :],
+                                         detections[:, begin_tmp: frame_index, :, :],
                                          update_history, args.T, args.max_velocity, mode="-1_1")
 
                     if frame_index - args.predictor_MCU_len < 0:
@@ -206,8 +206,8 @@ def train_and_evaluate(model,
         with torch.no_grad():
             with tqdm(total=len(test_loader), desc=f'{index}/{args.train_epochs}') as pbar:
                 for (detections, state_labels) in test_loader:
-                    detections = detections.to(args.device)  # (batch, n_frames_Ob, ob_num_max, 2)
-                    state_labels = state_labels.to(args.device)  # (batch, n_frames_state_labels, tg_num_max, 4)
+                    detections = detections.to(args.device)  # (batch, n_frames_Ob, ob_num_max, 3)
+                    state_labels = state_labels.to(args.device)  # (batch, n_frames_state_labels, tg_num_max, 9)
 
                     # 初始化类数组
                     tarTracks = TARTRACKS()  # 假设1个目标
@@ -239,13 +239,13 @@ def train_and_evaluate(model,
                                 update_history[:, -args.predictor_time_series_len:, :], args.T, args.max_velocity,
                                 mode="-1_1")
 
-                        tmp = (frame_index - args.predictor_MCU_len) if (
+                        begin_tmp = (frame_index - args.predictor_MCU_len) if (
                                                                                     frame_index - args.predictor_MCU_len) > 0 else 0
                         (_, normalized_detections_MCU, normalized_update_history_MCU,
                          min_vals, max_vals) = \
-                            minMaxScaler_MCU(state_labels[:, tmp: frame_index, :,
+                            minMaxScaler_MCU(state_labels[:, begin_tmp: frame_index, :,
                                              [0, 1, 3, 4, 6, 7]],
-                                             detections[:, tmp: frame_index, :, :],
+                                             detections[:, begin_tmp: frame_index, :, :],
                                              update_history, args.T, args.max_velocity, mode="-1_1")
 
                         if frame_index - args.predictor_MCU_len < 0:

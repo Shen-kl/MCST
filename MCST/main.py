@@ -41,8 +41,8 @@ if __name__ == '__main__':
     track_model = ManeuverCompensationStrongTracker(args.predictor_in_features,
                                                      args.predictor_hidden_features,
                                                      args.predictor_out_features,
+                                                     args.dropout_prob,
                                                      args.predictor_lstm_num_layers,
-                                                     args.predictor_MCU_num_layers,
                                                      args.predictor_sampling_num,
                                                      args.predictor_MCU_layer,
                                                      args.predictor_MCU_hidden_features,
@@ -57,8 +57,4 @@ if __name__ == '__main__':
                                                                          factor=args.optimizer_factor,
                                                                          patience=args.optimizer_patience)
 
-    train = 1
-    if train == 1:
-        train_and_evaluate(track_model, train_load, test_load, track_model_optimizer, track_model_lr_schedule, logger, args)
-    else:
-        evaluation(track_model, args)
+    train_and_evaluate(track_model, train_load, test_load, track_model_optimizer, track_model_lr_schedule, logger, args)

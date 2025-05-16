@@ -35,7 +35,7 @@ class DataLoad_OneManeuveringTarget_3D(data.Dataset):
         state_labels_ndarry = np.load(detail_data_path, allow_pickle=True).tolist()
         state_labels = torch.tensor(state_labels_ndarry, dtype=torch.float32).permute(0, 2, 1)
 
-        return [detections, state_labels]
+        return [detections, state_labels]  # detections [x y z]  state_labels[x vx ax y vy ay z vz az]
 
     def __len__(self):
         return self.dataSet_length
@@ -63,7 +63,7 @@ def DataLoadFromMatlab_oneTarget_3D_for_paper():
     state_labels =state_labels.unsqueeze(dim=0)
     detections = detections.unsqueeze(dim=0)
 
-    return state_labels, detections
+    return state_labels, detections # detections [x y z]  state_labels[x vx ax y vy ay z vz az]
 
 
 def enu2rae(enu_x, enu_y, enu_z):

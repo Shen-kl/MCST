@@ -9,6 +9,80 @@ from utils.MinMaxScaler import MyMinMaxScaler
 from utils.LossCompute import LossCompute_NLL
 import time
 import config
+from typing import Callable
+
+def normalize(tarTracks: TARTRACKS, state_labels, detections, minMaxScaler: Callable, minMaxScaler_MCU: Callable, frame_index, args):
+    # 函数功能： 归一化
+    update_history = torch.cat(tarTracks.x_update_history, dim=1).clone()
+    input_sigma = torch.cat(tarTracks.x_sigma, dim=1).detach()
+    # 对LSTM 输入归一化
+    begin_index = (frame_index - args.predictor_time_series_len) if (frame_index - args.predictor_time_series_len) > 0 else 0
+    input_sigma = input_sigma[:, begin_index:, :]
+    (normalized_state_labels, normalized_detections, normalized_update_history,
+     min_vals, max_vals) = \
+        minMaxScaler(state_labels[:, frame_index - args.predictor_time_series_len: frame_index + 1, :,
+                                     [0, 1, 3, 4, 6, 7]],
+                     detections[:, begin_index: frame_index + 1, :, :],
+                     update_history[:, begin_index:, :], args.T, args.max_velocity, mode="-1_1")
+
+    # 对MCU 输入归一化
+    begin_MCU_index = (frame_index - args.predictor_MCU_len) if (frame_index - args.predictor_MCU_len) > 0 else 0
+    (_, normalized_detections_MCU, normalized_update_history_MCU,
+     min_vals, max_vals) = \
+        minMaxScaler_MCU(state_labels[:, begin_MCU_index: frame_index, :,
+                                         [0, 1, 3, 4, 6, 7]],
+                         detections[:, begin_MCU_index: frame_index, :, :],
+                         update_history[:, begin_MCU_index:, :], args.T, args.max_velocity, mode="-1_1")
+    # 对长度不足的序列补零
+    if frame_index - args.predictor_time_series_len < 0:
+        normalized_detections = torch.cat([torch.zeros([normalized_detections.shape[0],
+                                                            args.predictor_time_series_len - normalized_detections.shape[1],
+                                                            normalized_detections.shape[2],
+                                                            normalized_detections.shape[3]]).to(
+            normalized_detections.device),
+                                               normalized_detections], dim=1)
+        normalized_update_history = torch.cat([torch.zeros([normalized_update_history.shape[0],
+                                                                args.predictor_time_series_len -
+                                                                normalized_update_history.shape[1],
+                                                                normalized_update_history.shape[2]]).to(
+            normalized_update_history.device),
+                                                   normalized_update_history], dim=1)
+        input_sigma = torch.cat([torch.zeros([input_sigma.shape[0],
+                                                        args.predictor_time_series_len -
+                                                        input_sigma.shape[1],
+                                                        input_sigma.shape[2]]).to(
+        input_sigma.device),
+        input_sigma], dim=1)
+
+        normalized_state_labels = torch.cat([torch.zeros([normalized_state_labels.shape[0],
+                                                        args.predictor_time_series_len -
+                                                        normalized_state_labels.shape[1],
+                                                        normalized_state_labels.shape[2]]).to(
+        normalized_state_labels.device),
+        normalized_state_labels], dim=1)
+
+    # 对长度不足的序列补零
+    if frame_index - args.predictor_MCU_len < 0:
+        normalized_detections_MCU = torch.cat([torch.zeros([normalized_detections_MCU.shape[0],
+                                                            args.predictor_MCU_len - normalized_detections_MCU.shape[1],
+                                                            normalized_detections_MCU.shape[2],
+                                                            normalized_detections_MCU.shape[3]]).to(
+            normalized_detections_MCU.device),
+                                               normalized_detections_MCU], dim=1)
+        normalized_update_history_MCU = torch.cat([torch.zeros([normalized_update_history_MCU.shape[0],
+                                                                args.predictor_MCU_len -
+                                                                normalized_update_history_MCU.shape[1],
+                                                                normalized_update_history_MCU.shape[2]]).to(
+            normalized_update_history_MCU.device),
+                                                   normalized_update_history_MCU], dim=1)
+
+
+
+    normalized_detections = normalized_detections.squeeze(dim=2)
+    normalized_detections_MCU = normalized_detections_MCU.squeeze(dim=2)
+
+    return normalized_update_history, normalized_update_history_MCU, normalized_detections, normalized_detections_MCU,\
+        normalized_state_labels, input_sigma
 
 def train_and_evaluate(model,
           train_loader: DataLoader,
@@ -57,42 +131,10 @@ def train_and_evaluate(model,
                 for frame_index in range(args.predictor_time_series_len, detections.shape[1]):
                     config.frame_index = frame_index
                     # 对张量进行最小-最大归一化
-                    predict_history = torch.cat(tarTracks.x_predict_history, dim=1).clone()
-                    update_history = torch.cat(tarTracks.x_update_history, dim=1).clone()
-                    (normalized_state_labels, normalized_detections, normalized_update_history,
-                     min_vals, max_vals) = \
-                        minMaxScaler(state_labels[:, frame_index - args.predictor_time_series_len: frame_index + 1, :,
-                                     [0, 1, 3, 4, 6, 7]],
-                                     detections[:, frame_index - args.predictor_time_series_len: frame_index + 1, :, :],
-                                     update_history[:, -args.predictor_time_series_len:, :], args.T, args.max_velocity,
-                                     mode="-1_1")
+                    normalized_update_history, normalized_update_history_MCU, normalized_detections, normalized_detections_MCU, \
+                    normalized_state_labels, input_sigma = normalize(tarTracks, state_labels, detections, minMaxScaler,
+                                                                     minMaxScaler_MCU, frame_index, args)
 
-                    begin_tmp = (frame_index - args.predictor_MCU_len) if (frame_index - args.predictor_MCU_len) > 0 else 0
-                    (_, normalized_detections_MCU, normalized_update_history_MCU,
-                     min_vals, max_vals) = \
-                        minMaxScaler_MCU(state_labels[:, begin_tmp: frame_index, :,
-                                         [0, 1, 3, 4, 6, 7]],
-                                         detections[:, begin_tmp: frame_index, :, :],
-                                         update_history, args.T, args.max_velocity, mode="-1_1")
-
-                    if frame_index - args.predictor_MCU_len < 0:
-                        normalized_detections_MCU = torch.cat([torch.zeros([normalized_detections_MCU.shape[0],
-                                                                            args.predictor_MCU_len -
-                                                                            normalized_detections_MCU.shape[1],
-                                                                            normalized_detections_MCU.shape[2],
-                                                                            normalized_detections_MCU.shape[3]]).to(
-                            normalized_detections_MCU.device), normalized_detections_MCU], dim=1)
-                        normalized_update_history_MCU = torch.cat([torch.zeros([normalized_update_history_MCU.shape[0],
-                                                                                args.predictor_MCU_len -
-                                                                                normalized_update_history_MCU.shape[1],
-                                                                                normalized_update_history_MCU.shape[
-                                                                                    2]]).to(
-                            normalized_update_history_MCU.device), normalized_update_history_MCU], dim=1)
-
-                    input_sigma = torch.cat(tarTracks.x_sigma, dim=1).detach()
-
-                    normalized_detections = normalized_detections.squeeze(dim=2)
-                    normalized_detections_MCU = normalized_detections_MCU.squeeze(dim=2)
                     # 预测
                     output_normalized_predict, output_predict_sigma, (h_predict, c_predict), \
                     output_normalized_update, output_update_sigma, \
@@ -101,7 +143,7 @@ def train_and_evaluate(model,
                                       normalized_update_history.to(args.device), normalized_detections_MCU, normalized_update_history_MCU.to(args.device),
                                 (h_predict, c_predict))
 
-                    # 更新 predict update
+                    # 反归一化 predict update
                     predict_output_data = minMaxScaler.deMinMaxScaler(
                         output_normalized_predict.unsqueeze(dim=2)).squeeze(
                         dim=2)
@@ -109,19 +151,9 @@ def train_and_evaluate(model,
                         dim=2)
 
                     # 更新历史
-                    if len(tarTracks.x_update_history) == args.predictor_MCU_len:
-                        tarTracks.x_predict_history.pop(0)
-                        tarTracks.x_predict_history.append(predict_output_data)
-                        tarTracks.x_sigma.pop(0)
-                        tarTracks.x_sigma.append(output_update_sigma)
-                        tarTracks.x_update_history.pop(0)
-                        tarTracks.x_update_history.append(update_output_data)
-                    else:
-                        tarTracks.x_predict_history.pop(0)
-                        tarTracks.x_predict_history.append(predict_output_data)
-                        tarTracks.x_sigma.pop(0)
-                        tarTracks.x_sigma.append(output_update_sigma)
-                        tarTracks.x_update_history.append(update_output_data)
+                    tarTracks.x_sigma.append(output_update_sigma)
+                    tarTracks.x_update_history.append(update_output_data)
+
 
                     # 计算loss
                     state_labels_copy0 = normalized_state_labels[:, -1, 0, :].unsqueeze(dim=1)
@@ -140,11 +172,12 @@ def train_and_evaluate(model,
                     loss = loss + predict_loss + update_loss
 
                     single_loss = predict_loss.data + update_loss.data
-                    # 所有损失
+                    # 保存所有损失
                     total_loss.append(single_loss.item())
                     total_predict_loss.append(predict_loss.item())
                     total_update_loss.append(update_loss.item())
 
+                    # 根据评价指标计算误差
                     state_labels_copy1 = state_labels[:, frame_index, 0, [0, 1, 3, 4, 6, 7]].unsqueeze(dim=1).data
 
                     predict_location_evaluation = mse(predict_output_data[:,:,0::2].data, state_labels_copy1[:,:,0::2])
@@ -228,43 +261,11 @@ def train_and_evaluate(model,
                     loss = 0
                     for frame_index in range(args.predictor_time_series_len, detections.shape[1]):
                         # 对张量进行最小-最大归一化
-                        predict_history = torch.cat(tarTracks.x_predict_history, dim=1).clone()
-                        update_history = torch.cat(tarTracks.x_update_history, dim=1).clone()
-                        (normalized_state_labels, normalized_detections, normalized_update_history,
-                         min_vals, max_vals) = \
-                            minMaxScaler(
-                                state_labels[:, frame_index - args.predictor_time_series_len: frame_index + 1, :,
-                                [0, 1, 3, 4, 6, 7]],
-                                detections[:, frame_index - args.predictor_time_series_len: frame_index + 1, :, :],
-                                update_history[:, -args.predictor_time_series_len:, :], args.T, args.max_velocity,
-                                mode="-1_1")
+                        normalized_update_history, normalized_update_history_MCU, normalized_detections, normalized_detections_MCU, \
+                        normalized_state_labels, input_sigma = normalize(tarTracks, state_labels, detections,
+                                                                         minMaxScaler,
+                                                                         minMaxScaler_MCU, frame_index, args)
 
-                        begin_tmp = (frame_index - args.predictor_MCU_len) if (
-                                                                                    frame_index - args.predictor_MCU_len) > 0 else 0
-                        (_, normalized_detections_MCU, normalized_update_history_MCU,
-                         min_vals, max_vals) = \
-                            minMaxScaler_MCU(state_labels[:, begin_tmp: frame_index, :,
-                                             [0, 1, 3, 4, 6, 7]],
-                                             detections[:, begin_tmp: frame_index, :, :],
-                                             update_history, args.T, args.max_velocity, mode="-1_1")
-
-                        if frame_index - args.predictor_MCU_len < 0:
-                            normalized_detections_MCU = torch.cat([torch.zeros([normalized_detections_MCU.shape[0],
-                                                                                args.predictor_MCU_len -
-                                                                                normalized_detections_MCU.shape[1],
-                                                                                normalized_detections_MCU.shape[2],
-                                                                                normalized_detections_MCU.shape[3]]).to(
-                                normalized_detections_MCU.device), normalized_detections_MCU], dim=1)
-                            normalized_update_history_MCU = torch.cat(
-                                [torch.zeros([normalized_update_history_MCU.shape[0],
-                                              args.predictor_MCU_len - normalized_update_history_MCU.shape[1],
-                                              normalized_update_history_MCU.shape[2]]).to(
-                                    normalized_update_history_MCU.device), normalized_update_history_MCU], dim=1)
-                            
-                        input_sigma = torch.cat(tarTracks.x_sigma, dim=1).detach()
-
-                        normalized_detections = normalized_detections.squeeze(dim=2)
-                        normalized_detections_MCU = normalized_detections_MCU.squeeze(dim=2)
                         # 预测
                         output_normalized_predict, output_predict_sigma, (h_predict, c_predict), \
                         output_normalized_update, output_update_sigma, \
@@ -274,7 +275,7 @@ def train_and_evaluate(model,
                                     normalized_update_history_MCU.to(args.device),
                                     (h_predict, c_predict))
 
-                        # 更新 predict update
+                        # 反归一化 predict update
                         predict_output_data = minMaxScaler.deMinMaxScaler(
                             output_normalized_predict.unsqueeze(dim=2)).squeeze(
                             dim=2)
@@ -283,19 +284,8 @@ def train_and_evaluate(model,
                             dim=2)
 
                         # 更新历史
-                        if len(tarTracks.x_update_history) == args.predictor_MCU_len:
-                            tarTracks.x_predict_history.pop(0)
-                            tarTracks.x_predict_history.append(predict_output_data)
-                            tarTracks.x_sigma.pop(0)
-                            tarTracks.x_sigma.append(output_update_sigma)
-                            tarTracks.x_update_history.pop(0)
-                            tarTracks.x_update_history.append(update_output_data)
-                        else:
-                            tarTracks.x_predict_history.pop(0)
-                            tarTracks.x_predict_history.append(predict_output_data)
-                            tarTracks.x_sigma.pop(0)
-                            tarTracks.x_sigma.append(output_update_sigma)
-                            tarTracks.x_update_history.append(update_output_data)
+                        tarTracks.x_sigma.append(output_update_sigma)
+                        tarTracks.x_update_history.append(update_output_data)
 
                         # 计算loss
                         state_labels_copy0 = normalized_state_labels[:, -1, 0, :].unsqueeze(dim=1)
@@ -314,11 +304,12 @@ def train_and_evaluate(model,
                         loss = loss + predict_loss + update_loss
 
                         single_loss = predict_loss.data + update_loss.data
-                        # 所有损失
+                        # 保存所有损失
                         total_loss.append(single_loss.item())
                         total_predict_loss.append(predict_loss.item())
                         total_update_loss.append(update_loss.item())
 
+                        # 根据评价指标计算误差
                         state_labels_copy1 = state_labels[:, frame_index, 0, [0, 1, 3, 4, 6, 7]].unsqueeze(dim=1).data
 
                         predict_location_evaluation = mse(predict_output_data[:, :, 0::2].data,

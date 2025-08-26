@@ -7,8 +7,6 @@ from models.AttentionMechanism import AdditiveAttention
 from models.MLP import ResMLP
 import matplotlib.pyplot as plt
 
-
-
 class Updater(nn.Module):
     def __init__(self,
                  in_features: int,

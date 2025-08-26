@@ -11,72 +11,47 @@ import time
 import config
 from typing import Callable
 
-def normalize(tarTracks: TARTRACKS, state_labels, detections, minMaxScaler: Callable, minMaxScaler_MCU: Callable, frame_index, args):
+def normalize(tarTracks: TARTRACKS, state_labels, detections, minMaxScaler: Callable, minMaxScaler_MCU: Callable, frame_index: int, args, epoch_index):
     # 函数功能： 归一化
     update_history = torch.cat(tarTracks.x_update_history, dim=1).clone()
     input_sigma = torch.cat(tarTracks.x_sigma, dim=1).detach()
+
+    def _pad_sequence(tensor: torch.Tensor, target_len: int) -> torch.Tensor:
+        """对长度不足的序列补零"""
+        pad_len = target_len - tensor.shape[1]
+        if pad_len > 0:
+            pad_shape = [tensor.shape[0], pad_len] + list(tensor.shape[2:])
+            padding = torch.zeros(pad_shape, device=tensor.device)
+            tensor = torch.cat([padding, tensor], dim=1)
+        return tensor
+
     # 对LSTM 输入归一化
-    begin_index = (frame_index - args.predictor_time_series_len) if (frame_index - args.predictor_time_series_len) > 0 else 0
+    begin_index = max(frame_index - args.predictor_time_series_len, 0)
     input_sigma = input_sigma[:, begin_index:, :]
     (normalized_state_labels, normalized_detections, normalized_update_history,
      min_vals, max_vals) = \
         minMaxScaler(state_labels[:, frame_index - args.predictor_time_series_len: frame_index + 1, :,
                                      [0, 1, 3, 4, 6, 7]],
                      detections[:, begin_index: frame_index + 1, :, :],
-                     update_history[:, begin_index:, :], args.T, args.max_velocity, mode="-1_1")
+                     update_history[:, begin_index:, :], args.T, (args.max_velocity, args.max_acceleration), mode="-1_1", frame_index=frame_index, epoch_index=epoch_index)
 
     # 对MCU 输入归一化
-    begin_MCU_index = (frame_index - args.predictor_MCU_len) if (frame_index - args.predictor_MCU_len) > 0 else 0
+    begin_MCU_index = max(frame_index - args.predictor_MCU_len, 0)
     (_, normalized_detections_MCU, normalized_update_history_MCU,
      min_vals, max_vals) = \
         minMaxScaler_MCU(state_labels[:, begin_MCU_index: frame_index, :,
                                          [0, 1, 3, 4, 6, 7]],
                          detections[:, begin_MCU_index: frame_index, :, :],
-                         update_history[:, begin_MCU_index:, :], args.T, args.max_velocity, mode="-1_1")
-    # 对长度不足的序列补零
-    if frame_index - args.predictor_time_series_len < 0:
-        normalized_detections = torch.cat([torch.zeros([normalized_detections.shape[0],
-                                                            args.predictor_time_series_len - normalized_detections.shape[1],
-                                                            normalized_detections.shape[2],
-                                                            normalized_detections.shape[3]]).to(
-            normalized_detections.device),
-                                               normalized_detections], dim=1)
-        normalized_update_history = torch.cat([torch.zeros([normalized_update_history.shape[0],
-                                                                args.predictor_time_series_len -
-                                                                normalized_update_history.shape[1],
-                                                                normalized_update_history.shape[2]]).to(
-            normalized_update_history.device),
-                                                   normalized_update_history], dim=1)
-        input_sigma = torch.cat([torch.zeros([input_sigma.shape[0],
-                                                        args.predictor_time_series_len -
-                                                        input_sigma.shape[1],
-                                                        input_sigma.shape[2]]).to(
-        input_sigma.device),
-        input_sigma], dim=1)
+                         update_history[:, begin_MCU_index:, :], args.T, (args.max_velocity, args.max_acceleration), mode="-1_1", frame_index=frame_index, epoch_index=epoch_index)
 
-        normalized_state_labels = torch.cat([torch.zeros([normalized_state_labels.shape[0],
-                                                        args.predictor_time_series_len -
-                                                        normalized_state_labels.shape[1],
-                                                        normalized_state_labels.shape[2]]).to(
-        normalized_state_labels.device),
-        normalized_state_labels], dim=1)
+    # 对不足长度序列进行补零
+    normalized_detections = _pad_sequence(normalized_detections, args.predictor_time_series_len)
+    normalized_update_history = _pad_sequence(normalized_update_history, args.predictor_time_series_len)
+    input_sigma = _pad_sequence(input_sigma, args.predictor_time_series_len)
+    normalized_state_labels = _pad_sequence(normalized_state_labels, args.predictor_time_series_len)
 
-    # 对长度不足的序列补零
-    if frame_index - args.predictor_MCU_len < 0:
-        normalized_detections_MCU = torch.cat([torch.zeros([normalized_detections_MCU.shape[0],
-                                                            args.predictor_MCU_len - normalized_detections_MCU.shape[1],
-                                                            normalized_detections_MCU.shape[2],
-                                                            normalized_detections_MCU.shape[3]]).to(
-            normalized_detections_MCU.device),
-                                               normalized_detections_MCU], dim=1)
-        normalized_update_history_MCU = torch.cat([torch.zeros([normalized_update_history_MCU.shape[0],
-                                                                args.predictor_MCU_len -
-                                                                normalized_update_history_MCU.shape[1],
-                                                                normalized_update_history_MCU.shape[2]]).to(
-            normalized_update_history_MCU.device),
-                                                   normalized_update_history_MCU], dim=1)
-
-
+    normalized_detections_MCU = _pad_sequence(normalized_detections_MCU, args.predictor_MCU_len)
+    normalized_update_history_MCU = _pad_sequence(normalized_update_history_MCU, args.predictor_MCU_len)
 
     normalized_detections = normalized_detections.squeeze(dim=2)
     normalized_detections_MCU = normalized_detections_MCU.squeeze(dim=2)
@@ -93,8 +68,8 @@ def train_and_evaluate(model,
           args: Args
           ):
 
-    minMaxScaler = MyMinMaxScaler()  #归一化方法
-    minMaxScaler_MCU = MyMinMaxScaler()  # 归一化方法
+    minMaxScaler = MyMinMaxScaler(use_max_velocity=False, train_mode=True)  #归一化方法
+    minMaxScaler_MCU = MyMinMaxScaler(use_max_velocity=False, train_mode=True)  # 归一化方法
     mse = nn.MSELoss(reduction='mean') #损失函数
     nll = LossCompute_NLL() #损失函数
     min_evaluation = 2e8
@@ -133,7 +108,7 @@ def train_and_evaluate(model,
                     # 对张量进行最小-最大归一化
                     normalized_update_history, normalized_update_history_MCU, normalized_detections, normalized_detections_MCU, \
                     normalized_state_labels, input_sigma = normalize(tarTracks, state_labels, detections, minMaxScaler,
-                                                                     minMaxScaler_MCU, frame_index, args)
+                                                                     minMaxScaler_MCU, frame_index, args, index)
 
                     # 预测
                     output_normalized_predict, output_predict_sigma, (h_predict, c_predict), \
@@ -264,7 +239,7 @@ def train_and_evaluate(model,
                         normalized_update_history, normalized_update_history_MCU, normalized_detections, normalized_detections_MCU, \
                         normalized_state_labels, input_sigma = normalize(tarTracks, state_labels, detections,
                                                                          minMaxScaler,
-                                                                         minMaxScaler_MCU, frame_index, args)
+                                                                         minMaxScaler_MCU, frame_index, args, index)
 
                         # 预测
                         output_normalized_predict, output_predict_sigma, (h_predict, c_predict), \

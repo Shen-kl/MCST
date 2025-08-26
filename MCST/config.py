@@ -14,9 +14,9 @@ class Args:
                             help='the output dir for model checkpoints')
         parser.add_argument('--checkpoint', default='../checkpoint/mcst_best.pth', type=str,
                             help='Path to model checkpoint')
-        parser.add_argument('--data_dir', default='G:/Dataset/OneManeuveringTarget3D/', type=str,
+        parser.add_argument('--data_dir', default='D:/Dataset/OneManeuveringTarget3D/', type=str,
                             help='data dir for uer')
-        parser.add_argument('--data_dir_test', default='G:/Dataset/OneManeuveringTarget3D_forTest/', type=str,
+        parser.add_argument('--data_dir_test', default='D:/Dataset/OneManeuveringTarget3D_forTest/', type=str,
                             help='evaluation data dir for uer')
         parser.add_argument('--log_dir', default='./log/demo_log.log', type=str,
                             help='log dir for uer')
@@ -58,7 +58,7 @@ class Args:
         parser.add_argument('--frame_max', default=100, type=int,
                             help='the maximum number of frames in a track')
         parser.add_argument('--max_velocity', default=340*5, type=float)  #  340*5
-
+        parser.add_argument('--max_acceleration', default=50, type=float)  #
         return parser
 
     def get_parser(self):

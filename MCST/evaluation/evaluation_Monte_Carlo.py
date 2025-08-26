@@ -1,110 +1,85 @@
 import torch
 import torch.nn as nn
 import time
+
+from sympy import false
+
 from data.load_data import *
 from utils.tracksManage import TARTRACKS
 import numpy as np
 import config
 import matplotlib.pyplot as plt
 from data.load_data import DataLoadFromMatlab_oneTarget_3D_for_paper
-import mpldatacursor
 from utils.MinMaxScaler import MyMinMaxScaler
 from models.MCST import ManeuverCompensationStrongTracker
 from statistics import mean
 from typing import Callable
 
 Monte_Carlo = 1
-def error_caculation(predict_output_cat_cpu, update_output_cat_cpu, state_labels_cpu):
+def error_caculation(predict_output: np.double, update_output: np.double, state_labels: np.double):
     # 函数功能： 计算误差结果 输出位置 速度上的误差
-    predict_error = ((predict_output_cat_cpu[0, :, 0, 0] -
-                      state_labels_cpu[0, args.predictor_time_series_len:, 0, 0]) ** 2
-                     + (predict_output_cat_cpu[0, :, 0, 2] -
-                        state_labels_cpu[0, args.predictor_time_series_len:, 0, 3]) ** 2
-                     + (predict_output_cat_cpu[0, :, 0, 4] -
-                        state_labels_cpu[0, args.predictor_time_series_len:, 0, 6]) ** 2
-                     ) ** 0.5
 
-    predict_vel_err = ((predict_output_cat_cpu[0, :, 0, 1] -
-                               state_labels_cpu[0, args.predictor_time_series_len:, 0, 1]) ** 2
-                              + (predict_output_cat_cpu[0, :, 0, 3] -
-                                 state_labels_cpu[0, args.predictor_time_series_len:, 0, 4]) ** 2
-                              + (predict_output_cat_cpu[0, :, 0, 5] -
-                                 state_labels_cpu[0, args.predictor_time_series_len:, 0, 7]) ** 2
-                              ) ** 0.5
-    update_err = ((update_output_cat_cpu[0, :, 0, 0] -
-                   state_labels_cpu[0, args.predictor_time_series_len:, 0, 0]) ** 2
-                  + (update_output_cat_cpu[0, :, 0, 2] -
-                     state_labels_cpu[0, args.predictor_time_series_len:, 0, 3]) ** 2
-                  + (update_output_cat_cpu[0, :, 0, 4] -
-                     state_labels_cpu[0, args.predictor_time_series_len:, 0, 6]) ** 2
-                  ) ** 0.5
-    update_vel_err = ((update_output_cat_cpu[0, :, 0, 1] -
-                       state_labels_cpu[0, args.predictor_time_series_len:, 0, 1]) ** 2
-                      + (update_output_cat_cpu[0, :, 0, 3] -
-                         state_labels_cpu[0, args.predictor_time_series_len:, 0, 4]) ** 2
-                      + (update_output_cat_cpu[0, :, 0, 5] -
-                         state_labels_cpu[0, args.predictor_time_series_len:, 0, 7]) ** 2
-                      ) ** 0.5
+    # 定义位置和速度索引
+    pos_idx = [0, 2, 4]
+    vel_idx = [1, 3, 5]
+    label_pos_idx = [0, 3, 6]
+    label_vel_idx = [1, 4, 7]
 
-    return predict_error, predict_vel_err, update_err, update_vel_err
+    start_idx = args.predictor_time_series_len
 
-def normalize(tarTracks: TARTRACKS, detections, minMaxScaler: Callable, minMaxScaler_MCU: Callable, frame_index):
+    def _calc_rmse(output: np.double, pos_or_vel_idx: list, label_idx: list):
+        diffs = [(output[0, :, 0, i] - state_labels[0, start_idx:, 0, j]) ** 2
+                 for i, j in zip(pos_or_vel_idx, label_idx)]
+        return np.sqrt(sum(diffs))
+
+    predict_error = _calc_rmse(predict_output, pos_idx, label_pos_idx)
+    predict_vel_err = _calc_rmse(predict_output, vel_idx, label_vel_idx)
+    update_error = _calc_rmse(update_output, pos_idx, label_pos_idx)
+    update_vel_err = _calc_rmse(update_output, vel_idx, label_vel_idx)
+
+    return predict_error, predict_vel_err, update_error, update_vel_err
+
+def normalize(tarTracks: TARTRACKS, detections, minMaxScaler: Callable, minMaxScaler_MCU: Callable, frame_index, args, epoch_index):
     # 函数功能： 归一化
     update_history = torch.cat(tarTracks.x_update_history, dim=1).clone()
     input_sigma = torch.cat(tarTracks.x_sigma, dim=1).detach()
+
+    def _pad_sequence(tensor: torch.Tensor, target_len: int) -> torch.Tensor:
+        """对长度不足的序列补零"""
+        pad_len = target_len - tensor.shape[1]
+        if pad_len > 0:
+            pad_shape = [tensor.shape[0], pad_len] + list(tensor.shape[2:])
+            padding = torch.zeros(pad_shape, device=tensor.device)
+            tensor = torch.cat([padding, tensor], dim=1)
+        return tensor
+
     # 对LSTM 输入归一化
-    begin_index = (frame_index - args.predictor_time_series_len) if (frame_index - args.predictor_time_series_len) > 0 else 0
+    begin_index = max(frame_index - args.predictor_time_series_len, 0)
     input_sigma = input_sigma[:, begin_index:, :]
     (normalized_detections, normalized_update_history,
      min_vals, max_vals) = \
         minMaxScaler(detections[:, begin_index: frame_index + 1, :, :],
-                     update_history[:, begin_index:, :], args.T, args.max_velocity, mode="-1_1")
+                     update_history[:, begin_index:, :], args.T, (args.max_velocity, args.max_acceleration), mode="-1_1", frame_index=frame_index, epoch_index=epoch_index)
 
     # 对MCU 输入归一化
-    begin_MCU_index = (frame_index - args.predictor_MCU_len) if (frame_index - args.predictor_MCU_len) > 0 else 0
+    begin_MCU_index = max(frame_index - args.predictor_MCU_len, 0)
     (normalized_detections_MCU, normalized_update_history_MCU,
      min_vals, max_vals) = \
         minMaxScaler_MCU(detections[:, begin_MCU_index: frame_index, :, :],
-                         update_history[:, begin_MCU_index:, :], args.T, args.max_velocity, mode="-1_1")
-    # 对长度不足的序列补零
-    if frame_index - args.predictor_time_series_len < 0:
-        normalized_detections = torch.cat([torch.zeros([normalized_detections.shape[0],
-                                                            args.predictor_time_series_len - normalized_detections.shape[1],
-                                                            normalized_detections.shape[2],
-                                                            normalized_detections.shape[3]]).to(
-            normalized_detections.device),
-                                               normalized_detections], dim=1)
-        normalized_update_history = torch.cat([torch.zeros([normalized_update_history.shape[0],
-                                                                args.predictor_time_series_len -
-                                                                normalized_update_history.shape[1],
-                                                                normalized_update_history.shape[2]]).to(
-            normalized_update_history.device),
-                                                   normalized_update_history], dim=1)
-        input_sigma = torch.cat([torch.zeros([input_sigma.shape[0],
-                                                        args.predictor_time_series_len -
-                                                        input_sigma.shape[1],
-                                                        input_sigma.shape[2]]).to(
-        input_sigma.device),
-        input_sigma], dim=1)
-    # 对长度不足的序列补零
-    if frame_index - args.predictor_MCU_len < 0:
-        normalized_detections_MCU = torch.cat([torch.zeros([normalized_detections_MCU.shape[0],
-                                                            args.predictor_MCU_len - normalized_detections_MCU.shape[1],
-                                                            normalized_detections_MCU.shape[2],
-                                                            normalized_detections_MCU.shape[3]]).to(
-            normalized_detections_MCU.device),
-                                               normalized_detections_MCU], dim=1)
-        normalized_update_history_MCU = torch.cat([torch.zeros([normalized_update_history_MCU.shape[0],
-                                                                args.predictor_MCU_len -
-                                                                normalized_update_history_MCU.shape[1],
-                                                                normalized_update_history_MCU.shape[2]]).to(
-            normalized_update_history_MCU.device),
-                                                   normalized_update_history_MCU], dim=1)
+                         update_history[:, begin_MCU_index:, :], args.T, (args.max_velocity, args.max_acceleration), mode="-1_1", frame_index=frame_index, epoch_index=epoch_index)
 
+    # 对不足长度序列进行补零
+    normalized_detections = _pad_sequence(normalized_detections, args.predictor_time_series_len)
+    normalized_update_history = _pad_sequence(normalized_update_history, args.predictor_time_series_len)
+    input_sigma = _pad_sequence(input_sigma, args.predictor_time_series_len)
 
+    normalized_detections_MCU = _pad_sequence(normalized_detections_MCU, args.predictor_MCU_len)
+    normalized_update_history_MCU = _pad_sequence(normalized_update_history_MCU, args.predictor_MCU_len)
 
+    # 移除冗余维度
     normalized_detections = normalized_detections.squeeze(dim=2)
     normalized_detections_MCU = normalized_detections_MCU.squeeze(dim=2)
+
 
     return normalized_update_history, normalized_update_history_MCU, normalized_detections, normalized_detections_MCU,\
         input_sigma
@@ -113,8 +88,8 @@ def normalize(tarTracks: TARTRACKS, detections, minMaxScaler: Callable, minMaxSc
 def evaluation(model, args):
     state_labels, detections = DataLoadFromMatlab_oneTarget_3D_for_paper()
 
-    minMaxScaler = MyMinMaxScaler()
-    minMaxScaler_MCU = MyMinMaxScaler()  # 归一化方法
+    minMaxScaler = MyMinMaxScaler(use_max_velocity=False, train_mode=False)
+    minMaxScaler_MCU = MyMinMaxScaler(use_max_velocity=False, train_mode=False)  # 归一化方法
 
     detections = detections.to(args.device)  # (batch, n_frames_Ob, ob_num_max, 3)
     state_labels = state_labels.to(args.device)  # (batch, n_frames_state_labels, tg_num_max, 9)
@@ -122,7 +97,7 @@ def evaluation(model, args):
     detections = detections.to(torch.float32)
     state_labels = state_labels.to(torch.float32)
 
-    model.load_state_dict(torch.load(args.checkpoint)['state_dict'])  # 2024_03_26_20_42_ 2024_04_01_20_02_
+    model.load_state_dict(torch.load(args.checkpoint, map_location=torch.device('cpu'))['state_dict'])
 
     # 模型设置
     model.eval()
@@ -142,7 +117,7 @@ def evaluation(model, args):
     for frame_index in range(args.predictor_time_series_len, detections.shape[1]):  #开始当前sequence
         # 对张量进行最小-最大归一化
         normalized_update_history, normalized_update_history_MCU, normalized_detections, normalized_detections_MCU, \
-        input_sigma = normalize(tarTracks, detections, minMaxScaler, minMaxScaler_MCU, frame_index)
+        input_sigma = normalize(tarTracks, detections, minMaxScaler, minMaxScaler_MCU, frame_index, args, 0)
 
         predict_output_this_frame = []
         update_output_this_frame = []

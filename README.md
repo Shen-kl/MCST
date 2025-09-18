@@ -111,3 +111,22 @@ If you find this work helpful, please cite our paper:
 
 ---
 
+
+
+## 📜 Changelog
+
+#### 2025/9/18
+
+#### Added
+
+- We have added the functionality to export the model in **TorchScript** format.
+
+#### Changed
+
+- The computation of the location-dependent min–max bounds in min–max normalization has been revised.
+  Specifically, the original scheme that relied on a fixed maximum velocity has been replaced by a hybrid strategy that blends the fixed maximum velocity with the model-estimated filtered velocity.
+
+#### Fixed
+
+- Fixed the lack of normalization for the gain matrix $W$ in the Update class. This yields more balanced gradient distributions across all model layers.
+

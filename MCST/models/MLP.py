@@ -13,52 +13,60 @@ class Affine(nn.Module):
 
 
 class MLP(nn.Module):
-    def __init__(self, dim, dropout_rate):
+    """一个标准的两层 MLP：Linear -> Activation -> Dropout -> Norm"""
+    def __init__(self, dim, hidden_dim=None, dropout=0.1, activation=nn.LeakyReLU):
         super().__init__()
-        self.fc1 = nn.Linear(dim, 2 * dim)
-        self.norm = nn.LayerNorm(2 * dim, eps=1e-6)
-        # self.norm = Affine(2 * dim)
-        self.act = nn.LeakyReLU(0.2, inplace=True)
-        self.fc2 = nn.Linear(2 * dim, dim)
-        self.dropout = nn.Dropout(dropout_rate)
-        self.rest_parameter()
+        hidden_dim = hidden_dim or dim
+        self.fc1 = nn.Linear(dim, hidden_dim)
+        self.act = activation(0.1, inplace=False)
+        self.fc2 = nn.Linear(hidden_dim, dim)
+        self.dropout = nn.Dropout(dropout)
+        self.norm = nn.LayerNorm(dim)
 
-    def rest_parameter(self):
-        gain = nn.init.calculate_gain('leaky_relu', 0.2)
+        self.reset_parameters()
+
+    def reset_parameters(self):
         nn.init.kaiming_normal_(self.fc1.weight, mode='fan_in', nonlinearity='leaky_relu')
         nn.init.kaiming_normal_(self.fc2.weight, mode='fan_in', nonlinearity='leaky_relu')
+        if self.fc1.bias is not None:
+            nn.init.zeros_(self.fc1.bias)
+        if self.fc2.bias is not None:
+            nn.init.zeros_(self.fc2.bias)
 
     def forward(self, x):
+        residual = x
         x = self.fc1(x)
-        x = self.dropout(x)
-        x = self.norm(x)
         x = self.act(x)
         x = self.dropout(x)
         x = self.fc2(x)
+        x = self.dropout(x)
+        x = self.norm(x + residual)  # 残差 + 归一化
         return x
 
 
 class ResMLP(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim, layer_num, dropout_rate):
+    """输入 -> Linear1 -> 多层 Residual MLP -> Linear2 -> 输出"""
+    def __init__(self, input_dim, hidden_dim, output_dim, layer_num=4, dropout_rate=0.1):
         super().__init__()
         self.linear1 = nn.Linear(input_dim, hidden_dim)
+        self.mlp_blocks = nn.ModuleList([
+            MLP(hidden_dim, hidden_dim, dropout_rate) for _ in range(layer_num)
+        ])
         self.linear2 = nn.Linear(hidden_dim, output_dim)
-        cell_list = nn.ModuleList([])
-        for i in range(layer_num):
-            cell_list.append(
-                MLP(hidden_dim, dropout_rate)
-            )
-        self.mlp = cell_list
-        self.rest_parameter()
 
-    def rest_parameter(self):
+        self.reset_parameters()
+
+    def reset_parameters(self):
         nn.init.kaiming_normal_(self.linear1.weight, mode='fan_in', nonlinearity='leaky_relu')
         nn.init.kaiming_normal_(self.linear2.weight, mode='fan_in', nonlinearity='leaky_relu')
+        if self.linear1.bias is not None:
+            nn.init.zeros_(self.linear1.bias)
+        if self.linear2.bias is not None:
+            nn.init.zeros_(self.linear2.bias)
 
     def forward(self, x):
-        x_linear = self.linear1(x)
-        for layer in self.mlp:
-            x_output = layer(x_linear)
-            x_linear = x_linear + x_output
-        x = self.linear2(x_output)
+        x = self.linear1(x)
+        for block in self.mlp_blocks:
+            x = block(x)  # 每层 MLP 内部已经包含残差
+        x = self.linear2(x)
         return x

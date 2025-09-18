@@ -4,8 +4,7 @@ from typing import Tuple, Optional, Union
 
 class MyMinMaxScaler(nn.Module):
     """
-    Custom Min-Max Scaler for velocity/position tensors with optional max-velocity augmentation.
-    Supports scaling to [0,1] or [-1,1].
+    自定义最小最大标量，用于速度/位置张量的缩放。在训练阶段 使用warm-up策略逐渐改变位置最大值的求解方法 缩放范围[-1,1]
     """
 
     def __init__(self, use_max_velocity: bool = True, train_mode: bool = True):
@@ -25,8 +24,6 @@ class MyMinMaxScaler(nn.Module):
     ) -> Union[Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
                Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]]:
         """
-        Forward scaling function.
-
         Args:
             args: Variable input arguments
                 - 5 args: labels, detection, estimation, T, (max_velocity, max_acceleration)
@@ -72,7 +69,7 @@ class MyMinMaxScaler(nn.Module):
         frame_change_threshold: int
     ) -> Tuple[Optional[torch.Tensor], torch.Tensor, torch.Tensor]:
         """
-        Core scaling logic.
+        核心最小最大归一化函数
         """
         dim_size = len(estimation.shape)
         min_vals, max_vals = self._compute_min_max(
@@ -122,10 +119,10 @@ class MyMinMaxScaler(nn.Module):
         frame_change_threshold: int
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Compute min and max values for scaling.
+        计算最小最大值
         """
-        min_detection, _ = torch.min(detection[:, :-1, :, :], dim=1, keepdim=True)
-        max_detection, _ = torch.max(detection[:, :-1, :, :], dim=1, keepdim=True)
+        min_detection, _ = torch.min(detection[:, :, :, :], dim=1, keepdim=True)
+        max_detection, _ = torch.max(detection[:, :, :, :], dim=1, keepdim=True)
         dim_size = len(estimation.shape)
 
         shape_map = [estimation.shape[0], 1, 1, estimation.shape[-1]]
@@ -159,7 +156,7 @@ class MyMinMaxScaler(nn.Module):
 
     def _scale_tensor(self, x: torch.Tensor, min_vals: torch.Tensor, denom: torch.Tensor) -> torch.Tensor:
         """
-        Scale tensor based on min_vals and denominator.
+        基于最小最大值对tensor进行归一化
         """
         if x.shape[-1] == 6:
             return (x - min_vals) / denom
@@ -167,7 +164,7 @@ class MyMinMaxScaler(nn.Module):
             return (x - min_vals[:, :, :, 0::2]) / denom[:, :, :, 0::2]
 
     def deMinMaxScaler(self, x: torch.Tensor) -> torch.Tensor:
-        """Inverse scaling."""
+        """反归一化"""
         if self.min_vals is None or self.max_vals is None:
             raise RuntimeError("Scaler has not been fitted. Run forward() first.")
 
@@ -179,5 +176,5 @@ class MyMinMaxScaler(nn.Module):
             raise ValueError("MyMinMaxScaler: invalid mode")
 
     def alpha_schedule(self, step: int, warmup: int = 15, target: float = 0.8) -> float:
-        """Linear alpha warmup schedule."""
+        """基于warmup策略计算alpha"""
         return target if step >= warmup else target * (step / warmup)

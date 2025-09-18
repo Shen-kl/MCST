@@ -12,7 +12,7 @@ class Args:
         # args for path
         parser.add_argument('--output_dir', default='./checkpoint/',
                             help='the output dir for model checkpoints')
-        parser.add_argument('--checkpoint', default='../checkpoint/mcst_best.pth', type=str,
+        parser.add_argument('--checkpoint', default='../checkpoint/2025_09_01_08_26_.pth', type=str,
                             help='Path to model checkpoint')
         parser.add_argument('--data_dir', default='D:/Dataset/OneManeuveringTarget3D/', type=str,
                             help='data dir for uer')
@@ -39,7 +39,7 @@ class Args:
         # train args
         parser.add_argument('--dropout_prob', default=0.1, type=float,
                             help='drop out probability')
-        parser.add_argument('--T', default=0.4, type=float,
+        parser.add_argument('--T', default=3, type=float,
                             help='data rate') # 0.4  3
         parser.add_argument('--predictor_in_features', default=6, type=float)
         parser.add_argument('--predictor_hidden_features', default=64, type=float)
@@ -57,8 +57,8 @@ class Args:
         parser.add_argument('--updater_dropoutrate', default=0.1, type=float)
         parser.add_argument('--frame_max', default=100, type=int,
                             help='the maximum number of frames in a track')
-        parser.add_argument('--max_velocity', default=340*5, type=float)  #  340*5
-        parser.add_argument('--max_acceleration', default=50, type=float)  #
+        parser.add_argument('--max_velocity', default=40, type=float)  #  340*5
+        parser.add_argument('--max_acceleration', default=10, type=float)  #
         return parser
 
     def get_parser(self):

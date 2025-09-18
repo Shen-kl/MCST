@@ -84,6 +84,7 @@ def normalize(tarTracks: TARTRACKS, detections, minMaxScaler: Callable, minMaxSc
     return normalized_update_history, normalized_update_history_MCU, normalized_detections, normalized_detections_MCU,\
         input_sigma
 
+
 # 使用六维状态向量
 def evaluation(model, args):
     state_labels, detections = DataLoadFromMatlab_oneTarget_3D_for_paper()
@@ -129,7 +130,7 @@ def evaluation(model, args):
             = model(input_sigma, normalized_detections,
                     normalized_update_history.to(args.device), normalized_detections_MCU,
                     normalized_update_history_MCU.to(args.device),
-                    (h_predict, c_predict),np.random.rand(1) >= 0.7)
+                    (h_predict, c_predict),np.random.rand(1) >= 1.0)
         # 更新 predict update
         predict_output_data = minMaxScaler.deMinMaxScaler(
             output_normalized_predict.unsqueeze(dim=2)).squeeze(

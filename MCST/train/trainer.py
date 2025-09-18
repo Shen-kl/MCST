@@ -59,6 +59,7 @@ def normalize(tarTracks: TARTRACKS, state_labels, detections, minMaxScaler: Call
     return normalized_update_history, normalized_update_history_MCU, normalized_detections, normalized_detections_MCU,\
         normalized_state_labels, input_sigma
 
+
 def train_and_evaluate(model,
           train_loader: DataLoader,
           test_loader: DataLoader,
@@ -128,7 +129,6 @@ def train_and_evaluate(model,
                     # 更新历史
                     tarTracks.x_sigma.append(output_update_sigma)
                     tarTracks.x_update_history.append(update_output_data)
-
 
                     # 计算loss
                     state_labels_copy0 = normalized_state_labels[:, -1, 0, :].unsqueeze(dim=1)

@@ -65,6 +65,25 @@ def DataLoadFromMatlab_oneTarget_3D_for_paper():
 
     return state_labels, detections # detections [x y z]  state_labels[x vx ax y vy ay z vz az]
 
+def DataLoadFromMatlab_UAV_3D_for_paper():
+    # 加载实测数据
+    path = "F:/MATLABPrograms/radar/DataProcessing/MCST/UAV_data/uav_enu_detection_data_U_complete.mat"
+    matr = io.loadmat(path)
+    savedata_ob = matr.get('uav_enu_detection_data')
+    savedata_ob = savedata_ob.astype(float)
+    detections = torch.tensor(savedata_ob).unsqueeze(dim=0).unsqueeze(dim=2)
+
+    detections_flag = matr.get('detection_flag')
+    detections_flag = detections_flag.astype(float)
+    detections_flag = torch.tensor(detections_flag)
+
+    path = "F:/MATLABPrograms/radar/DataProcessing/MCST/UAV_data/UAV_RTK_U_complete.mat"
+    matr = io.loadmat(path)
+    matchAzmDji = matr.get('matchAzmDji').astype(float)
+    matchDisDji = matr.get('matchDisDji').astype(float)
+    matchEleDji = matr.get('matchEleDji').astype(float)
+
+    return detections, detections_flag, matchDisDji, matchAzmDji, matchEleDji
 
 def enu2rae(enu_x, enu_y, enu_z):
     distance = (enu_x ** 2 + enu_y ** 2 + enu_z ** 2) ** 0.5

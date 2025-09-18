@@ -69,6 +69,6 @@ class AdditiveAttention(nn.Module):
         # self.w_v仅有一个输出，因此从形状中移除最后那个维度。
         # scores的形状：(batch_size，查询的个数，“键-值”对的个数)
         scores = self.w_v(features).squeeze(-1)
-        self.attention_weights = torch.softmax(scores,dim=-1)
+        attention_weights = torch.softmax(scores,dim=-1)
         # values的形状：(batch_size，“键－值”对的个数，值的维度)
-        return torch.bmm(self.dropout(self.attention_weights), values)
+        return torch.bmm(self.dropout(attention_weights), values)

@@ -134,15 +134,15 @@ def train_and_evaluate(model,
                     state_labels_copy0 = normalized_state_labels[:, -1, 0, :].unsqueeze(dim=1)
                     detections_copy0 = normalized_detections[:, -1, :].unsqueeze(dim=1)
 
-                    predict_loss = nll(output_normalized_predict, output_predict_sigma,
+                    predict_loss = 0.2 * nll(output_normalized_predict, output_predict_sigma,
                                        state_labels_copy0) + \
-                                   mse(output_normalized_predict, state_labels_copy0)
+                                   0.8 * mse(output_normalized_predict, state_labels_copy0)
 
-                    update_loss = nll(detections_copy0, output_detection_predict_sigma,
+                    update_loss = 0.1 * nll(detections_copy0, output_detection_predict_sigma,
                                       state_labels_copy0[:, :, 0::2]) \
-                                  + nll(output_normalized_update, output_update_sigma,
+                                  + 0.1 * nll(output_normalized_update, output_update_sigma,
                                         state_labels_copy0) + \
-                                  mse(output_normalized_update, state_labels_copy0)
+                                  0.8 * mse(output_normalized_update, state_labels_copy0)
 
                     loss = loss + predict_loss + update_loss
 
@@ -266,15 +266,15 @@ def train_and_evaluate(model,
                         state_labels_copy0 = normalized_state_labels[:, -1, 0, :].unsqueeze(dim=1)
                         detections_copy0 = normalized_detections[:, -1, :].unsqueeze(dim=1)
 
-                        predict_loss = nll(output_normalized_predict, output_predict_sigma,
+                        predict_loss = 0.2 * nll(output_normalized_predict, output_predict_sigma,
                                            state_labels_copy0) + \
-                                       mse(output_normalized_predict, state_labels_copy0)
+                                       0.8 * mse(output_normalized_predict, state_labels_copy0)
 
-                        update_loss = nll(detections_copy0, output_detection_predict_sigma,
+                        update_loss = 0.1 * nll(detections_copy0, output_detection_predict_sigma,
                                           state_labels_copy0[:, :, 0::2]) \
-                                      + nll(output_normalized_update, output_update_sigma,
+                                      + 0.1 * nll(output_normalized_update, output_update_sigma,
                                             state_labels_copy0) + \
-                                      mse(output_normalized_update, state_labels_copy0)
+                                      0.8 * mse(output_normalized_update, state_labels_copy0)
 
                         loss = loss + predict_loss + update_loss
 

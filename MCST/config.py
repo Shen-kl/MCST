@@ -26,7 +26,7 @@ class Args:
 
         parser.add_argument('--device', default=torch.device("cuda" if torch.cuda.is_available() else "cpu"), #
                             help='cpu or gpu')
-        parser.add_argument('--train_batch_size', default=8, type=int)
+        parser.add_argument('--train_batch_size', default=16, type=int)
         parser.add_argument('--train_epochs', default=5000, type=int,
                             help='Max training epoch')
         parser.add_argument('--test_epochs', default=10, type=int,
@@ -39,7 +39,7 @@ class Args:
         # train args
         parser.add_argument('--dropout_prob', default=0.1, type=float,
                             help='drop out probability')
-        parser.add_argument('--T', default=3, type=float,
+        parser.add_argument('--T', default=0.4, type=float,
                             help='data rate') # 0.4  3
         parser.add_argument('--predictor_in_features', default=6, type=float)
         parser.add_argument('--predictor_hidden_features', default=64, type=float)
@@ -57,8 +57,8 @@ class Args:
         parser.add_argument('--updater_dropoutrate', default=0.1, type=float)
         parser.add_argument('--frame_max', default=100, type=int,
                             help='the maximum number of frames in a track')
-        parser.add_argument('--max_velocity', default=40, type=float)  #  340*5
-        parser.add_argument('--max_acceleration', default=10, type=float)  #
+        parser.add_argument('--max_velocity', default=340*5, type=float)  #  340*5
+        parser.add_argument('--max_acceleration', default=80, type=float)  #
         return parser
 
     def get_parser(self):
